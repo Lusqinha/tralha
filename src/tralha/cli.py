@@ -175,7 +175,7 @@ def cmd_gc(args) -> None:
 def setting(value: str) -> tuple[str, str]:
     name, sep, val = value.partition("=")
     if not sep:
-        raise argparse.ArgumentTypeError("use nome=valor")
+        raise argparse.ArgumentTypeError("use name=value")
     return name, val
 
 
