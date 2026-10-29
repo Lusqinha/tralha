@@ -1,7 +1,7 @@
 """MCP server at /mcp.
 
-BearerMiddleware answers 401 before a request reaches the protocol. Each tool still
-authenticates again, because it runs in another task and cannot see the request scope.
+AccessGuard answers 401 before a request reaches the protocol. Each tool still
+authenticates again, because it runs in another task and cannot see the request state.
 Tool docstrings are the description the model reads to decide what to call, so changing
 the wording changes its behavior.
 """
@@ -13,8 +13,6 @@ from fastmcp.exceptions import ToolError
 from fastmcp.server.dependencies import get_http_request
 from fastmcp.utilities.types import Image
 from pydantic import Field
-from starlette.concurrency import run_in_threadpool
-from starlette.responses import JSONResponse
 
 from tralha import images, service, storage
 from tralha.auth import Principal, authenticate
@@ -36,7 +34,9 @@ mcp = FastMCP("tralha", instructions=INSTRUCTIONS, mask_error_details=True)
 
 
 def _principal() -> Principal:
-    p = authenticate(get_http_request().headers.get("authorization"))
+    request = get_http_request()
+    client_ip = request.client.host if request.client else None
+    p = authenticate(request.headers.get("authorization"), client_ip)
     if p is None:
         raise ToolError("missing or invalid API key")
     return p
@@ -177,21 +177,3 @@ def search_docs(
 ) -> list[dict[str, Any]]:
     """Full-text search over text documents (markdown, logs, JSON...)."""
     return _call(service.search, query, bucket, limit)
-
-
-class BearerMiddleware:
-    def __init__(self, app):
-        self.app = app
-
-    async def __call__(self, scope, receive, send):
-        if scope["type"] == "http":
-            headers = dict(scope["headers"])
-            auth = headers.get(b"authorization", b"").decode()
-            if await run_in_threadpool(authenticate, auth) is None:
-                response = JSONResponse(
-                    {"detail": "missing or invalid API key"},
-                    status_code=401,
-                    headers={"WWW-Authenticate": "Bearer"},
-                )
-                return await response(scope, receive, send)
-        await self.app(scope, receive, send)

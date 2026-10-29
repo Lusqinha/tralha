@@ -23,10 +23,20 @@ class Settings:
     port: int
     public_port: int
     forwarded_allow_ips: str
+    admin_allowed_ips: str
+    api_docs: bool
+
+    @property
+    def secure_cookies(self) -> bool:
+        return self.api_url.startswith("https://")
 
     @property
     def max_request_bytes(self) -> int:
         return self.max_upload_bytes + 1024 * 1024
+
+    @property
+    def max_json_bytes(self) -> int:
+        return 1024 * 1024
 
     @property
     def max_panel_upload_bytes(self) -> int:
@@ -64,4 +74,6 @@ def get_settings() -> Settings:
         port=port,
         public_port=public_port,
         forwarded_allow_ips=os.environ.get("TRALHA_FORWARDED_ALLOW_IPS", "127.0.0.1"),
+        admin_allowed_ips=os.environ.get("TRALHA_ADMIN_ALLOWED_IPS", ""),
+        api_docs=os.environ.get("TRALHA_API_DOCS", "").lower() in ("1", "true", "yes"),
     )

@@ -11,19 +11,20 @@ before it take precedence.
 
 import asyncio
 import logging
+import re
 from contextlib import asynccontextmanager
 
 from fastapi import FastAPI, Request
 from fastapi.responses import JSONResponse, RedirectResponse
 from starlette.concurrency import run_in_threadpool
-from starlette.middleware import Middleware
 from starlette.staticfiles import StaticFiles
 
 from tralha import admin, api, public, service
 from tralha.config import Settings, get_settings
 from tralha.db import init_db
+from tralha.guard import AccessGuard, parse_networks
 from tralha.limits import BodySizeLimit
-from tralha.mcp_server import BearerMiddleware, mcp
+from tralha.mcp_server import mcp
 
 log = logging.getLogger("tralha")
 
@@ -51,11 +52,25 @@ def _service_errors_as_json(app: FastAPI) -> None:
         return JSONResponse({"detail": str(exc)}, status_code=exc.status)
 
 
+_OBJECT_PATH = re.compile(r"^/api/buckets/[^/]+/objects/.+")
+
+
+def _private_body_limit(settings: Settings):
+    def limit_for(method: str, path: str) -> int:
+        if path == "/admin/actions/upload":
+            return settings.max_panel_upload_bytes
+        if path.startswith(("/upload/", "/mcp")) or (method == "PUT" and _OBJECT_PATH.match(path)):
+            return settings.max_request_bytes
+        return settings.max_json_bytes
+
+    return limit_for
+
+
 def create_public_app() -> FastAPI:
     _prepare_storage()
     app = FastAPI(title="tralha", docs_url=None, redoc_url=None, openapi_url=None)
     _service_errors_as_json(app)
-    app.add_middleware(BodySizeLimit, max_bytes=0)
+    app.add_middleware(BodySizeLimit, limit_for=lambda method, path: 0)
     app.include_router(public.router)
     app.add_api_route("/healthz", api.healthz)
     return app
@@ -64,7 +79,7 @@ def create_public_app() -> FastAPI:
 def create_app() -> FastAPI:
     settings = _prepare_storage()
 
-    mcp_app = mcp.http_app(path="/mcp", middleware=[Middleware(BearerMiddleware)])
+    mcp_app = mcp.http_app(path="/mcp")
 
     @asynccontextmanager
     async def lifespan(app: FastAPI):
@@ -73,11 +88,13 @@ def create_app() -> FastAPI:
             yield
             task.cancel()
 
+    docs_paths = ("/api/docs", "/api/openapi.json")
     app = FastAPI(
         title="tralha",
         lifespan=lifespan,
-        docs_url="/api/docs",
-        openapi_url="/api/openapi.json",
+        docs_url=docs_paths[0] if settings.api_docs else None,
+        redoc_url=None,
+        openapi_url=docs_paths[1] if settings.api_docs else None,
     )
 
     @app.exception_handler(service.ServiceError)
@@ -92,10 +109,12 @@ def create_app() -> FastAPI:
     async def _login_required(_: Request, __: admin.LoginRequired):
         return RedirectResponse("/admin/login", status_code=303)
 
+    app.add_middleware(BodySizeLimit, limit_for=_private_body_limit(settings))
     app.add_middleware(
-        BodySizeLimit,
-        max_bytes=settings.max_request_bytes,
-        overrides={"/admin/actions/upload": settings.max_panel_upload_bytes},
+        AccessGuard,
+        admin_networks=parse_networks(settings.admin_allowed_ips),
+        open_paths=("/healthz", "/p/", "/b/", "/upload/")
+        + (docs_paths if settings.api_docs else ()),
     )
     app.include_router(public.router)
     app.include_router(api.router)

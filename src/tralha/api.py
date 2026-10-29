@@ -18,8 +18,9 @@ from tralha.public import PRIVATE_NO_CACHE, serve, serve_original
 router = APIRouter()
 
 
-def principal(authorization: Annotated[str | None, Header()] = None) -> Principal:
-    p = authenticate(authorization)
+def principal(request: Request, authorization: Annotated[str | None, Header()] = None) -> Principal:
+    client_ip = request.client.host if request.client else None
+    p = getattr(request.state, "principal", None) or authenticate(authorization, client_ip)
     if p is None:
         raise HTTPException(
             401, "missing or invalid API key", headers={"WWW-Authenticate": "Bearer"}

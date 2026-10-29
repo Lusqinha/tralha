@@ -21,7 +21,7 @@ from starlette.concurrency import run_in_threadpool
 from tralha import images, service, storage, system
 from tralha.auth import Principal, authenticate, principal_for_key_id
 from tralha.config import get_settings
-from tralha.db import admin_sessions, api_keys, get_engine, now
+from tralha.db import admin_sessions, get_engine, now
 from tralha.public import PRIVATE_NO_CACHE, sanitized_markdown_html, serve, serve_original
 
 router = APIRouter(prefix="/admin")
@@ -77,24 +77,25 @@ def _hash(token: str) -> str:
     return hashlib.sha256(token.encode()).hexdigest()
 
 
-def admin(request: Request) -> Principal:
-    token = request.cookies.get(COOKIE)
+def session_principal(token: str | None) -> Principal | None:
     if not token:
-        raise LoginRequired
+        return None
     with get_engine().connect() as conn:
-        row = conn.execute(
-            select(api_keys)
-            .select_from(admin_sessions.join(api_keys))
-            .where(
+        key_id = conn.execute(
+            select(admin_sessions.c.key_id).where(
                 admin_sessions.c.token_hash == _hash(token),
                 admin_sessions.c.expires_at > now(),
-                api_keys.c.revoked_at.is_(None),
             )
-        ).first()
-    if row is None:
-        raise LoginRequired
-    principal = principal_for_key_id(row.id)
-    if principal is None or not principal.is_admin:
+        ).scalar()
+    principal = principal_for_key_id(key_id) if key_id else None
+    return principal if principal and principal.is_admin else None
+
+
+def admin(request: Request) -> Principal:
+    principal = getattr(request.state, "principal", None) or session_principal(
+        request.cookies.get(COOKIE)
+    )
+    if principal is None:
         raise LoginRequired
     return principal
 
@@ -123,6 +124,7 @@ def page(
     template: str,
     principal: Principal | None = None,
     section: str = "files",
+    status_code: int = 200,
     **context,
 ) -> Response:
     context.setdefault("current_bucket", context.get("bucket"))
@@ -135,6 +137,7 @@ def page(
             "section": section,
             **context,
         },
+        status_code=status_code,
     )
     response.headers["Content-Security-Policy"] = _panel_csp()
     response.headers["Cache-Control"] = "no-store"
@@ -166,10 +169,14 @@ def login_form(request: Request):
 
 @router.post("/login", dependencies=[Post])
 def login(request: Request, key: Annotated[str, Form()]):
-    principal = authenticate(f"Bearer {key.strip()}")
+    client_ip = request.client.host if request.client else None
+    principal = authenticate(f"Bearer {key.strip()}", client_ip)
     if principal is None or not principal.is_admin:
         return page(
-            request, "login.html", error="Invalid key, or the key lacks the '*:admin' scope."
+            request,
+            "login.html",
+            status_code=401,
+            error="Invalid key, or the key lacks the '*:admin' scope.",
         )
     token = secrets.token_urlsafe(32)
     with get_engine().begin() as conn:
@@ -186,7 +193,7 @@ def login(request: Request, key: Annotated[str, Form()]):
         max_age=SESSION_TTL,
         httponly=True,
         samesite="strict",
-        secure=request.url.scheme == "https",
+        secure=get_settings().secure_cookies or request.url.scheme == "https",
         path="/admin",
     )
     return response

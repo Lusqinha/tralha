@@ -1,3 +1,5 @@
+from collections.abc import Callable
+
 from starlette.responses import JSONResponse
 
 
@@ -6,19 +8,15 @@ class _BodyTooLarge(Exception):
 
 
 class BodySizeLimit:
-    def __init__(self, app, max_bytes: int, overrides: dict[str, int] | None = None):
+    def __init__(self, app, limit_for: Callable[[str, str], int]):
         self.app = app
-        self.max_bytes = max_bytes
-        self.overrides = overrides or {}
-
-    def _limit_for(self, path: str) -> int:
-        return self.overrides.get(path, self.max_bytes)
+        self.limit_for = limit_for
 
     async def __call__(self, scope, receive, send):
         if scope["type"] != "http":
             return await self.app(scope, receive, send)
 
-        limit = self._limit_for(scope["path"])
+        limit = self.limit_for(scope["method"], scope["path"])
         declared = dict(scope["headers"]).get(b"content-length")
         if declared and declared.isdigit() and int(declared) > limit:
             return await _too_large(scope, receive, send)
