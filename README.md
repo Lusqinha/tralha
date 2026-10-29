@@ -118,6 +118,10 @@ Then connect your local agent to `https://api.example.com/mcp`. With port 8000 o
 - `--expires` on `tralha key create` limits how long a leaked key stays useful. `tralha key list` shows when and from which IP each key was last used.
 - Prefer a VPN such as Tailscale if you would rather keep the API off the internet altogether. Bind port 8000 to the VPN address and point `TRALHA_API_URL` at it; the agent uses that URL for uploads.
 
+### On Easypanel
+
+In an Easypanel project, open **Templates → Create from Schema** and paste [`deploy/easypanel/schema.json`](deploy/easypanel/schema.json). Easypanel builds the image from `master`, serves the API and panel on the service domain and links on `files-` plus that domain, both over HTTPS. After the first deploy, create an admin key from the service console with `tralha key create admin --scope '*:admin'`.
+
 ## Configuration
 
 All settings are environment variables, and `.env.example` lists them with comments.
