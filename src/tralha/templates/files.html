@@ -1,0 +1,134 @@
+{% extends "base.html" %}
+{% from "_icons.html" import i, glyph_for with context %}
+{% block title %}{{ bucket or "Files" }}{% endblock %}
+{% block main %}
+{% if not bucket %}
+  <div class="bar"><div class="path"><strong>Files</strong></div></div>
+  <div class="content">
+    {% if nav_buckets %}
+    <div class="grid">
+      {% for b in nav_buckets %}
+      <a class="tile" href="{{ files_url(b.name) }}">
+        <div class="thumb folder">{{ i("boxes") }}</div>
+        <div class="caption"><span class="name mono">{{ b.name }}</span><span class="size">{{ b.objects }} items</span></div>
+      </a>
+      {% endfor %}
+    </div>
+    {% else %}
+    <div class="empty">
+      {{ i("boxes") }}
+      <h2>No buckets yet</h2>
+      <p>Buckets keep files apart by purpose, such as PR screenshots and drafts.</p>
+      <a class="btn primary" href="/admin/buckets">{{ i("plus") }}Create bucket</a>
+    </div>
+    {% endif %}
+  </div>
+{% else %}
+  <div class="bar">
+    <nav class="path" aria-label="Path">
+      {% if crumbs %}
+        <a class="tape" href="{{ files_url(bucket) }}"><span>{{ bucket }}</span></a>
+      {% else %}
+        <span class="tape"><span>{{ bucket }}</span></span>
+      {% endif %}
+      {% for part, path in crumbs %}
+        <span class="sep">/</span>
+        {% if loop.last %}<strong>{{ part }}</strong>{% else %}<a href="{{ files_url(bucket, path) }}">{{ part }}</a>{% endif %}
+      {% endfor %}
+    </nav>
+    <span class="spacer"></span>
+    {% if listing.objects or listing.prefixes %}
+    <label class="filter">{{ i("search") }}<input id="filter" type="search" placeholder="Filter this folder" aria-label="Filter this folder"></label>
+    <div class="seg" role="group" aria-label="View">
+      <button class="btn" type="button" data-view="grid" aria-label="Grid" aria-pressed="true">{{ i("grid") }}</button>
+      <button class="btn" type="button" data-view="list" aria-label="List" aria-pressed="false">{{ i("list") }}</button>
+    </div>
+    {% endif %}
+    <button class="btn" type="button" id="new-folder-toggle">{{ i("folder-plus") }}New folder</button>
+    <form class="newfolder" id="new-folder" data-base="{{ files_url(bucket) }}" data-prefix="{{ prefix }}" hidden>
+      <input placeholder="folder-name" aria-label="New folder name">
+      <button class="btn">Open</button>
+    </form>
+    <form id="upload" method="post" action="/admin/actions/upload" enctype="multipart/form-data">
+      <input type="hidden" name="bucket" value="{{ bucket }}">
+      <input type="hidden" name="prefix" value="{{ prefix }}">
+      <input type="file" name="files" id="files" multiple hidden>
+      <label for="files" class="btn primary" tabindex="0">{{ i("upload") }}Upload files</label>
+      <noscript><button class="btn">Upload</button></noscript>
+    </form>
+  </div>
+
+  <div class="content">
+    {% if listing.objects or listing.prefixes %}
+    <div class="grid" data-view-panel="grid">
+      {% for folder in listing.prefixes %}
+      {% set name = folder[prefix | length:] %}
+      <a class="tile" href="{{ files_url(bucket, folder) }}" data-name="{{ name }}">
+        <div class="thumb folder">{{ i("folder") }}</div>
+        <div class="caption"><span class="name">{{ name.rstrip("/") }}</span><span class="size">folder</span></div>
+      </a>
+      {% endfor %}
+      {% for o in listing.objects %}
+      {% set name = o.key[prefix | length:] %}
+      <a class="tile" href="{{ object_url(bucket, o.key) }}" data-name="{{ name }}" title="{{ o.key }}">
+        <div class="thumb">
+          {% if o.content_type in image_types %}
+            <img src="/admin/thumb/{{ bucket }}/{{ o.key | urlpath }}" alt="" loading="lazy">
+          {% else %}
+            <span class="glyph">{{ i(glyph_for(o.content_type)) }}<b>{{ name.rsplit('.', 1)[-1][:6] if '.' in name else o.content_type.split('/')[-1][:6] }}</b></span>
+          {% endif %}
+        </div>
+        <div class="caption"><span class="name">{{ name }}</span><span class="size">{{ o.size | bytes }}</span></div>
+      </a>
+      {% endfor %}
+    </div>
+
+    <table class="rows" data-view-panel="list" hidden>
+      <thead><tr><th>Name</th><th class="type">Type</th><th class="num">Size</th><th class="when">Modified</th></tr></thead>
+      <tbody>
+      {% for folder in listing.prefixes %}
+      {% set name = folder[prefix | length:] %}
+      <tr data-name="{{ name }}">
+        <td><a href="{{ files_url(bucket, folder) }}"><span class="mini folder">{{ i("folder") }}</span><span>{{ name.rstrip("/") }}</span></a></td>
+        <td class="type">folder</td><td class="num"></td><td class="when"></td>
+      </tr>
+      {% endfor %}
+      {% for o in listing.objects %}
+      {% set name = o.key[prefix | length:] %}
+      <tr data-name="{{ name }}">
+        <td><a href="{{ object_url(bucket, o.key) }}">
+          <span class="mini">{% if o.content_type in image_types %}<img src="/admin/thumb/{{ bucket }}/{{ o.key | urlpath }}" alt="" loading="lazy">{% else %}{{ i(glyph_for(o.content_type)) }}{% endif %}</span>
+          <span>{{ name }}</span></a></td>
+        <td class="type">{{ o.content_type }}</td>
+        <td class="num">{{ o.size | bytes }}</td>
+        <td class="when">{{ o.updated_at | date }}</td>
+      </tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if listing.truncated %}<p class="hint" style="margin-top:18px">Showing the first 500 items in this folder.</p>{% endif %}
+
+    {% elif prefix %}
+    <div class="empty">
+      {{ i("folder") }}
+      <h2>Empty folder</h2>
+      <p>A folder exists once it holds files. Upload something to <code>{{ prefix }}</code> or drop files on this page.</p>
+      <label for="files" class="btn primary">{{ i("upload") }}Upload files</label>
+    </div>
+    {% else %}
+    <div class="empty">
+      {{ i("upload") }}
+      <h2>Empty bucket</h2>
+      <p>Drop files on this page or use the button. Your AI can also upload through MCP.</p>
+      <label for="files" class="btn primary">{{ i("upload") }}Upload files</label>
+    </div>
+    {% endif %}
+  </div>
+
+  <div class="drop" id="drop" aria-hidden="true"><div>{{ i("upload") }}Drop to upload to {{ bucket }}/{{ prefix }}</div></div>
+  <div class="progress" id="progress" hidden role="status">
+    <div class="row"><span id="progress-label">Uploading</span><span id="progress-pct">0%</span></div>
+    <div class="track"><div class="fill" id="progress-fill"></div></div>
+  </div>
+{% endif %}
+{% endblock %}

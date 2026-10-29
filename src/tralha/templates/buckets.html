@@ -1,0 +1,107 @@
+{% extends "base.html" %}
+{% from "_icons.html" import i with context %}
+{% block title %}Manage buckets{% endblock %}
+{% block main %}
+<div class="bar"><div class="path"><strong>Manage buckets</strong></div></div>
+<div class="content narrow">
+  <div class="page-head">
+    <div>
+      <h1>Buckets</h1>
+      <p>Each bucket has its own visibility, compression, quota and cleanup rules.</p>
+    </div>
+    <form method="post" action="/admin/buckets" class="inline-create">
+      <input name="name" required pattern="[a-z0-9][a-z0-9\-]{1,61}[a-z0-9]" placeholder="bucket-name" aria-label="New bucket name"
+             title="3 to 63 characters: lowercase letters, digits and hyphens">
+      <button class="btn primary">{{ i("plus") }}Create bucket</button>
+    </form>
+  </div>
+
+  <div class="bucket-list">
+  {% for b in buckets %}
+    <article class="bucket">
+      <header>
+        <div>
+          <a class="tape lg" href="{{ files_url(b.name) }}"><span>{{ b.name }}</span></a>
+          <div class="facts-line">
+            <span><b>{{ b.objects }}</b> files</span>
+            <span>{{ "Public read" if b.visibility == "public-read" else "Private" }}</span>
+            <span>Compression: {{ b.compression or ("system default (" ~ system_compression ~ ")") }}</span>
+            <span>{{ b.rules | length }} cleanup rule{{ "s" if b.rules | length != 1 }}</span>
+          </div>
+        </div>
+        <div class="usage">
+          {% if b.max_bytes %}
+          {% set pct = [100, (b.bytes / b.max_bytes * 100) | round | int] | min %}
+          <span>{{ b.bytes | bytes }} of {{ b.max_bytes | bytes }}</span>
+          <div class="track"><div class="fill {{ 'hot' if pct >= 90 }}" style="width: {{ pct }}%"></div></div>
+          {% else %}
+          <span>{{ b.bytes | bytes }} used, no quota</span>
+          {% endif %}
+        </div>
+      </header>
+
+      <details class="body-wrap">
+        <summary class="btn quiet sm" style="margin: 0 18px 14px">Edit settings and rules</summary>
+        <div class="body">
+          <form method="post" action="/admin/buckets/{{ b.name }}" class="form-grid">
+            <label class="field"><span>Visibility</span>
+              <select name="visibility">
+                <option value="private" {{ "selected" if b.visibility == "private" }}>Private</option>
+                <option value="public-read" {{ "selected" if b.visibility == "public-read" }}>Public read</option>
+              </select>
+            </label>
+            <label class="field"><span>Image compression</span>
+              <select name="compression">
+                <option value="" {{ "selected" if not b.compression }}>System default ({{ system_compression }})</option>
+                <option value="off" {{ "selected" if b.compression == "off" }}>Off</option>
+                <option value="lossless" {{ "selected" if b.compression == "lossless" }}>Lossless</option>
+                <option value="lossy" {{ "selected" if b.compression == "lossy" }}>Lossy</option>
+              </select>
+            </label>
+            <label class="field"><span>Quota in MB</span>
+              <input type="number" name="max_mb" min="1" value="{{ (b.max_bytes // 1048576) if b.max_bytes else '' }}" placeholder="No limit">
+            </label>
+            <label class="field"><span>When the quota is full</span>
+              <select name="on_full">
+                <option value="reject" {{ "selected" if b.on_full == "reject" }}>Refuse new uploads</option>
+                <option value="evict-oldest" {{ "selected" if b.on_full == "evict-oldest" }}>Delete the oldest files</option>
+              </select>
+            </label>
+            <div class="actions"><button class="btn primary">Save changes</button></div>
+          </form>
+
+          <div>
+            <h2 style="margin-bottom:6px">Cleanup rules</h2>
+            {% for r in b.rules %}
+            <div class="rule">
+              <p>Deletes {% if r.prefix %}files in <code>{{ r.prefix }}</code>{% else %}any file{% endif %}
+                {{ "not accessed for over" if r.basis == "last-access" else "uploaded over" }} <b>{{ r.expire_after | duration_human }}</b>{{ " ago" if r.basis != "last-access" }}
+                {% if r.keep_shared %}<span class="badge">keeps linked files</span>{% endif %}
+              </p>
+              <form method="post" action="/admin/rules/{{ r.id }}/delete"><button class="linkbtn">Remove</button></form>
+            </div>
+            {% else %}
+            <p class="hint">No rules. Files stay until someone deletes them.</p>
+            {% endfor %}
+            <form method="post" action="/admin/buckets/{{ b.name }}/rules" class="rule-form" style="margin-top:12px">
+              <label class="field"><span>Delete when</span>
+                <select name="basis"><option value="created">older than</option><option value="last-access">not accessed for</option></select>
+              </label>
+              <label class="field"><span>Amount</span><input type="number" name="amount" min="1" value="7" required></label>
+              <label class="field"><span>Unit</span>
+                <select name="unit"><option value="3600">hours</option><option value="86400" selected>days</option></select>
+              </label>
+              <label class="field"><span>Only in folder (optional)</span><input name="prefix" placeholder="tmp/"></label>
+              <label class="check"><input type="checkbox" name="keep_shared" value="true" checked> Keep files that have an active link</label>
+              <button class="btn">{{ i("plus") }}Add rule</button>
+            </form>
+          </div>
+        </div>
+      </details>
+    </article>
+  {% else %}
+    <div class="empty">{{ i("boxes") }}<h2>No buckets</h2><p>Create the first one with the field above. <code>pr-assets</code> for PR screenshots is a good start.</p></div>
+  {% endfor %}
+  </div>
+</div>
+{% endblock %}

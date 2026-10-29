@@ -1,0 +1,18 @@
+{% extends "base.html" %}
+{% block title %}Sign in{% endblock %}
+{% block body %}
+<main class="login">
+  <form method="post" action="/admin/login">
+    <div class="login-brand">
+      <img src="/admin/static/icon.svg" width="56" height="56" alt="">
+      <span class="wordmark">tralha</span>
+    </div>
+    <label class="field"><span>Admin API key</span>
+      <input type="password" name="key" placeholder="trh_…" autocomplete="current-password" required autofocus>
+    </label>
+    {% if error %}<p class="error" role="alert">{{ error }}</p>{% endif %}
+    <button class="btn primary">Sign in</button>
+    <p>Don't have one? Create it on the server with <code>tralha key create admin --scope '*:admin'</code>.</p>
+  </form>
+</main>
+{% endblock %}

@@ -1,0 +1,113 @@
+{% extends "base.html" %}
+{% from "_icons.html" import i, glyph_for with context %}
+{% block title %}{{ name }}{% endblock %}
+{% block main %}
+{% set raw = "/admin/raw/" ~ bucket ~ "/" ~ (key | urlpath) %}
+<div class="bar">
+  <nav class="path" aria-label="Path">
+    <a class="tape" href="{{ files_url(bucket) }}"><span>{{ bucket }}</span></a>
+    {% for part, path in crumbs %}
+      <span class="sep">/</span><a href="{{ files_url(bucket, path) }}">{{ part }}</a>
+    {% endfor %}
+    <span class="sep">/</span><strong>{{ name }}</strong>
+  </nav>
+</div>
+
+<div class="object">
+  {% if obj.content_type in image_types or obj.content_type == "image/svg+xml" %}
+    <div class="stage checker"><img src="{{ raw }}" alt="{{ name }}"></div>
+  {% elif obj.content_type.startswith("video/") %}
+    <div class="stage"><video src="{{ raw }}" controls preload="metadata"></video></div>
+  {% elif markdown is not none %}
+    <div class="stage doc">
+      <div class="doc-tabs" role="group" aria-label="Reading mode">
+        <button class="btn sm" type="button" data-tab="doc" aria-pressed="true">Rendered</button>
+        <button class="btn sm" type="button" data-tab="text" aria-pressed="false">Source</button>
+      </div>
+      <article class="reader" data-panel="doc">{{ markdown | safe }}</article>
+      <pre class="source" data-panel="text" hidden>{{ text.content }}</pre>
+    </div>
+  {% elif text %}
+    <div class="stage doc"><pre class="source">{{ text.content }}</pre></div>
+  {% else %}
+    <div class="stage">
+      <div class="no-preview">{{ i(glyph_for(obj.content_type)) }}
+        <p>This file type has no preview.</p>
+        <a class="btn" href="{{ raw }}" download="{{ name }}">{{ i("download") }}Download</a>
+      </div>
+    </div>
+  {% endif %}
+
+  <aside class="inspector">
+    <div class="title">
+      <h1>{{ name }}</h1>
+      <p>{{ obj.size | bytes }}, {{ obj.content_type }}</p>
+    </div>
+
+    <section aria-labelledby="share-h">
+      <h2 id="share-h">Share</h2>
+      {% for s in shares %}
+      {% set md = ("![" if obj.content_type.startswith("image/") else "[") ~ name ~ "](" ~ s.url ~ ")" %}
+      <div class="link-card">
+        <input value="{{ s.url }}" readonly aria-label="Public link">
+        <div class="actions">
+          <button class="btn sm" type="button" data-copy="{{ s.url }}">{{ i("copy") }}<span>Copy link</span></button>
+          <button class="btn sm" type="button" data-copy="{{ md }}">{{ i("markdown") }}<span>Copy markdown</span></button>
+        </div>
+        <div class="meta">
+          <span>{{ "Expires " ~ (s.expires_at | date) if s.expires_at else "Never expires" }}</span>
+          <form method="post" action="/admin/actions/revoke" data-confirm="Revoke this link? Anyone with the address loses access.">
+            <input type="hidden" name="token" value="{{ s.token }}">
+            <input type="hidden" name="bucket" value="{{ bucket }}">
+            <input type="hidden" name="key" value="{{ key }}">
+            <button class="linkbtn">Revoke</button>
+          </form>
+        </div>
+      </div>
+      {% else %}
+      <p class="hint">No public link yet. Without one, the file is only reachable with an API key.</p>
+      {% endfor %}
+      <form method="post" action="/admin/actions/share" class="new-link">
+        <input type="hidden" name="bucket" value="{{ bucket }}">
+        <input type="hidden" name="key" value="{{ key }}">
+        <select name="expires_in" aria-label="Link expiry">
+          <option value="0">Never expires</option>
+          <option value="3600">Expires in 1 hour</option>
+          <option value="86400">Expires in 1 day</option>
+          <option value="604800">Expires in 7 days</option>
+          <option value="2592000">Expires in 30 days</option>
+        </select>
+        <button class="btn {{ 'primary' if not shares }}">{{ i("link") }}Create link</button>
+      </form>
+    </section>
+
+    <section aria-labelledby="facts-h">
+      <h2 id="facts-h">Details</h2>
+      <dl class="facts">
+        <dt>Path</dt><dd class="mono">{{ key }}</dd>
+        {% if obj.original_content_type %}
+        <dt>Compression</dt>
+        <dd>{{ obj.original_size | bytes }} {{ obj.original_content_type.split('/')[-1] | upper }} down to {{ obj.size | bytes }}
+          <span class="saving">({{ ((1 - obj.size / obj.original_size) * 100) | round | int }}% smaller)</span>
+          {% if obj.original_sha256 %}<br><a href="{{ raw }}?original=1">Download original</a>{% endif %}
+        </dd>
+        {% endif %}
+        <dt>Uploaded</dt><dd>{{ obj.updated_at | date }}</dd>
+        <dt>Last access</dt><dd>{{ obj.last_accessed_at | date if obj.last_accessed_at else "Never accessed" }}</dd>
+        <dt>Expires</dt><dd>{{ obj.expires_at | date if obj.expires_at else "Follows the bucket rules" }}</dd>
+        {% for k, v in obj.metadata.items() %}<dt>{{ k }}</dt><dd>{{ v }}</dd>{% endfor %}
+        <dt>SHA-256</dt><dd class="mono" title="{{ obj.sha256 }}">{{ obj.sha256[:20] }}…</dd>
+      </dl>
+    </section>
+
+    <div class="footer">
+      <a class="btn" href="{{ raw }}" download="{{ name }}">{{ i("download") }}Download</a>
+      <form method="post" action="/admin/actions/delete" data-confirm="Delete {{ key }}? Its public links stop working.">
+        <input type="hidden" name="bucket" value="{{ bucket }}">
+        <input type="hidden" name="key" value="{{ key }}">
+        <button class="btn danger">{{ i("trash") }}Delete</button>
+      </form>
+    </div>
+  </aside>
+</div>
+{% endblock %}
