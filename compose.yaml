@@ -5,7 +5,7 @@ services:
     env_file: .env
     ports:
       - "127.0.0.1:8000:8000"
-      - "8001:8001"
+      - "127.0.0.1:8001:8001"
     volumes:
       - tralha-data:/data
     read_only: true
@@ -15,6 +15,21 @@ services:
     security_opt:
       - no-new-privileges:true
     pids_limit: 256
+
+  caddy:
+    image: caddy:2.10-alpine
+    profiles: [proxy]
+    restart: unless-stopped
+    env_file: .env
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - caddy-data:/data
+      - caddy-config:/config
+    depends_on: [tralha]
 
   postgres:
     image: postgres:17-alpine
@@ -27,6 +42,14 @@ services:
     volumes:
       - postgres-data:/var/lib/postgresql/data
 
+networks:
+  default:
+    ipam:
+      config:
+        - subnet: 172.30.0.0/24
+
 volumes:
   tralha-data:
   postgres-data:
+  caddy-data:
+  caddy-config:
