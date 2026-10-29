@@ -436,7 +436,7 @@ def _maybe_compress(
     try:
         data = images.to_webp_if_smaller(writer.tmp_path, content_type, policy)
     except Exception:
-        log.warning("falha ao comprimir; mantendo o original", exc_info=True)
+        log.warning("compression failed; keeping the original", exc_info=True)
         return writer, content_type, None
     if data is None:
         return writer, content_type, None
