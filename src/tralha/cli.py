@@ -228,7 +228,7 @@ def main() -> None:
     p = bucket.add_parser("set", help="change a bucket")
     p.add_argument("name")
     p.add_argument("--public", action=argparse.BooleanOptionalAction, default=None)
-    p.add_argument("--max-size", type=size, help="0 remove a quota")
+    p.add_argument("--max-size", type=size, help="0 removes the quota")
     p.add_argument("--on-full", choices=service.ON_FULL)
     p.add_argument("--compression", choices=("inherit", *system.COMPRESSION_MODES))
     p.set_defaults(fn=cmd_bucket_set)
