@@ -2,7 +2,9 @@
   <img src="src/tralha/static/icon.svg" width="96" height="96" alt="">
 </p>
 
-<h1 align="center">tralha</h1>
+<h1 align="center">TRALHA</h1>
+
+<p align="center"><b>T</b>ool for <b>R</b>emote <b>A</b>rtifact <b>L</b>inking &amp; <b>H</b>osting for <b>A</b>Is</p>
 
 <p align="center">
   Self-hosted storage for the files your AI agents produce, with public links when you want them and an MCP server so agents can use it on their own.
@@ -14,7 +16,7 @@ The same place keeps the notes and findings the agent writes along the way. Mark
 
 Everything is private by default. A file only becomes reachable from the internet when someone creates a link for it, and that link can be revoked.
 
-*Tralha* is Portuguese for odds and ends, the stuff that piles up in a junk drawer. It also stands for **T**ool for **R**emote **A**rtifact **L**inking & **H**osting for **A**Is.
+*Tralha* is Portuguese for odds and ends, the stuff that piles up in a junk drawer.
 
 ![The admin panel showing a screenshot with its public link and details](docs/panel.png)
 
