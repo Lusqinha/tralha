@@ -14,6 +14,8 @@ The same place keeps the notes and findings the agent writes along the way. Mark
 
 Everything is private by default. A file only becomes reachable from the internet when someone creates a link for it, and that link can be revoked.
 
+*Tralha* is Portuguese for odds and ends, the stuff that piles up in a junk drawer. It also stands for **T**ool for **R**emote **A**rtifact **L**inking & **H**osting for **A**Is.
+
 ![The admin panel showing a screenshot with its public link and details](docs/panel.png)
 
 ## How it works
@@ -24,10 +26,10 @@ tralha listens on two ports:
 
 | Port | Serves | Who should reach it |
 |---|---|---|
-| 8000 (private) | REST API, MCP server, uploads, admin panel | You and your agents, over your network or a VPN |
-| 8001 (public) | `/p/<token>` links and public-read buckets at `/b/…` | The internet, including GitHub's image proxy |
+| 8000 (private) | REST API, MCP server, uploads, admin panel | You and your agents |
+| 8001 (public) | `/p/<token>` links and public-read buckets at `/b/…` | Anyone, including GitHub's image proxy |
 
-The split is by port because a Host header can be forged from outside, so exposing only port 8001 keeps everything else out of reach.
+The split is by port because a Host header can be forged from outside. Port 8001 serves nothing that needs a key. Port 8000 turns away any request without a valid key or panel session before reading its body, so it can face the internet behind HTTPS, the way an S3 endpoint does, or stay on a VPN if you prefer.
 
 Links are random tokens stored in the database. They never expire unless you ask for an expiry, because an image in a merged PR should keep working. A revoked link stops resolving at once, although browsers and GitHub's image proxy may keep a cached copy for up to an hour.
 
@@ -43,7 +45,7 @@ With Docker:
 
 ```sh
 git clone https://github.com/Lusqinha/tralha.git && cd tralha
-cp .env.example .env            # set TRALHA_PUBLIC_URL to the address of port 8001
+cp .env.example .env            # the defaults work on your own machine
 docker compose up -d --build
 
 docker compose exec tralha tralha bucket create pr-assets
@@ -66,16 +68,16 @@ Open http://localhost:8000/admin and sign in with the admin key to browse files,
 
 ## Connect an AI agent
 
-Create a key for the agent with only the access it needs:
+Create a key for the agent with only the access it needs. `--expires` is optional:
 
 ```sh
-tralha key create claude \
+tralha key create claude --expires 90d \
   --scope '*:read' \
   --scope 'pr-assets:write' --scope 'pr-assets:share' \
   --scope 'scratch:write' --scope 'scratch:share'
 ```
 
-Add it to Claude Code:
+Add it to Claude Code. On a VPS, use your API domain instead of localhost:
 
 ```sh
 claude mcp add --transport http --scope user tralha http://localhost:8000/mcp \
@@ -92,17 +94,25 @@ The MCP tools cover buckets, text documents, binary uploads, image previews for 
 
 ChatGPT connectors require OAuth, which tralha does not support yet.
 
-## Make links public
+## Deploy on a VPS
 
-GitHub loads PR images through its own proxy, so port 8001 has to be reachable from the internet. Put it behind a reverse proxy with TLS, for example Caddy:
+GitHub loads PR images through its own proxy, so links must be reachable from the internet over HTTPS. The compose file ships an optional Caddy proxy that serves both ports on their own domains and gets certificates by itself.
 
-```
-files.example.com {
-	reverse_proxy localhost:8001
-}
-```
+1. Point two DNS records at the server, for example `api.example.com` and `files.example.com`.
+2. In `.env`, switch to the VPS block: set `TRALHA_API_URL` and `TRALHA_PUBLIC_URL` to the two `https://` addresses and `TRALHA_API_DOMAIN` and `TRALHA_FILES_DOMAIN` to the bare domains.
+3. Start everything with the proxy profile:
 
-Set `TRALHA_PUBLIC_URL=https://files.example.com` so generated links use that address. Keep port 8000 on your private network.
+   ```sh
+   docker compose --profile proxy up -d --build
+   ```
+
+Only ports 80 and 443 open on the server. Both tralha ports stay bound to localhost, and Caddy reaches them over the compose network. `TRALHA_FORWARDED_ALLOW_IPS` already trusts that network, so tralha sees the real client IP and HTTPS scheme, and the panel cookie gets the `Secure` flag.
+
+Then connect your local agent to `https://api.example.com/mcp`. With port 8000 on the internet, a few extra steps help:
+
+- `TRALHA_ADMIN_ALLOWED_IPS` restricts the panel to your IPs or networks. Anyone else gets a 404 at `/admin`, while the API and MCP keep working from anywhere.
+- `--expires` on `tralha key create` limits how long a leaked key stays useful. `tralha key list` shows when and from which IP each key was last used.
+- Prefer a VPN such as Tailscale if you would rather keep the API off the internet altogether. Bind port 8000 to the VPN address and point `TRALHA_API_URL` at it; the agent uses that URL for uploads.
 
 ## Configuration
 
@@ -119,7 +129,10 @@ All settings are environment variables, and `.env.example` lists them with comme
 | `TRALHA_MAX_UPLOAD_MB` | `25` | Maximum size of one file |
 | `TRALHA_UPLOAD_TTL` | `600` | Seconds an upload URL stays valid |
 | `TRALHA_GC_INTERVAL` | `3600` | Seconds between cleanup runs |
-| `TRALHA_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxies trusted for `X-Forwarded-*` headers |
+| `TRALHA_FORWARDED_ALLOW_IPS` | `127.0.0.1` | Proxies trusted for `X-Forwarded-*` headers; `.env.example` sets the compose network |
+| `TRALHA_ADMIN_ALLOWED_IPS` | empty (anyone) | IPs or networks allowed to open `/admin` |
+| `TRALHA_API_DOCS` | off | Serve OpenAPI docs at `/api/docs` |
+| `TRALHA_API_DOMAIN`, `TRALHA_FILES_DOMAIN` | none | Domains for the bundled Caddy |
 
 Compression and keeping originals are changed at runtime from the panel or with `tralha settings compression=lossless`.
 
@@ -130,6 +143,9 @@ Uploaded files come from agents, and agents may copy content from untrusted plac
 - Image decoding never happens in the server process. Each image is handled by a short-lived worker that cannot create processes, has capped memory and CPU, and, on Linux 5.13 or newer, runs under a Landlock ruleset that blocks running programs, opening TCP connections and touching any file other than its input and output.
 - Pillow only opens PNG, JPEG, GIF and WebP, so a file disguised as an image cannot reach decoders such as Ghostscript. Oversized images and decompression bombs are rejected before decoding. tralha does not use ImageMagick, Ghostscript, librsvg or ffmpeg.
 - The content type comes from the file's bytes, not from what the client claims. Everything served publicly carries a sandbox CSP, so an uploaded SVG or HTML file cannot run scripts, and HTML is served as a download.
+- On port 8000, a request without a valid key or panel session is rejected before its body is read. JSON bodies are capped at 1 MB, and file bodies at the upload limit.
+- An IP that sends 20 bad keys, panel logins or upload tokens within 5 minutes is locked out for 15 minutes.
+- Keys can expire, and each use records the time and client IP.
 - The admin panel uses HttpOnly, SameSite=Strict session cookies, refuses cross-origin form posts and allows no inline scripts.
 - The container runs as a non-root user with a read-only root filesystem, no Linux capabilities and a process limit.
 
