@@ -1,0 +1,7 @@
+{$TRALHA_API_DOMAIN} {
+	reverse_proxy tralha:8000
+}
+
+{$TRALHA_FILES_DOMAIN} {
+	reverse_proxy tralha:8001
+}

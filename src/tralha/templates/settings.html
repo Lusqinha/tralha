@@ -1,0 +1,60 @@
+{% extends "base.html" %}
+{% from "_icons.html" import i with context %}
+{% block title %}System{% endblock %}
+{% block main %}
+<div class="bar"><div class="path"><strong>System</strong></div></div>
+<div class="content narrow">
+  <form method="post" action="/admin/settings" class="panel">
+    <header>
+      <h2>Image compression</h2>
+      <p>Applies to future uploads in every bucket that uses the system default. Stored files do not change.</p>
+    </header>
+    <div class="choices">
+      {% set labels = {
+        "off": ("Off", "Stores each file exactly as it was uploaded."),
+        "lossless": ("Lossless", "PNG and GIF become pixel-identical WebP, usually 25 to 40% smaller. Good for visual-check screenshots."),
+        "lossy": ("Lossy", "PNG, JPEG and GIF become WebP at the quality below. Much smaller, but small text can blur."),
+      } %}
+      {% for m in modes %}
+      <label class="choice">
+        <input type="radio" name="compression" value="{{ m }}" {{ "checked" if settings.compression == m }}>
+        <strong>{{ labels[m][0] }}</strong>
+        <small>{{ labels[m][1] }}</small>
+      </label>
+      {% endfor %}
+    </div>
+    <div class="quality" id="quality">
+      <div class="row"><span>Quality</span><output id="quality-out">{{ settings.compression_quality }}</output></div>
+      <input type="range" name="compression_quality" min="40" max="100" value="{{ settings.compression_quality }}" aria-label="Lossy compression quality">
+    </div>
+    <label class="check"><input type="checkbox" name="keep_original" value="true" {{ "checked" if settings.keep_original }}>
+      Also keep the original file so it can be downloaded later</label>
+    <p class="hint">The compressed version only replaces the original when it is at least 5% smaller.</p>
+    <div><button class="btn primary">Save compression</button></div>
+  </form>
+
+  <section class="panel">
+    <header>
+      <h2>Cleanup</h2>
+      <p>Each bucket's rules run automatically every hour.</p>
+    </header>
+    {% if cleanup %}
+    <p>The next cleanup will delete {{ cleanup | length }} file{{ "s" if cleanup | length != 1 }} and free {{ cleanup_bytes | bytes }}.</p>
+    <table class="cleanup-table">
+      <thead><tr><th>File</th><th>Size</th><th>Reason</th></tr></thead>
+      <tbody>
+      {% for v in cleanup[:50] %}
+      <tr><td><span class="tape" style="font-size:11.5px;padding:3px 9px">{{ v.bucket }}</span> <span class="mono">{{ v.key }}</span></td><td>{{ v.size | bytes }}</td><td>{{ v.reason }}</td></tr>
+      {% endfor %}
+      </tbody>
+    </table>
+    {% if cleanup | length > 50 %}<p class="hint">And {{ cleanup | length - 50 }} more.</p>{% endif %}
+    <form method="post" action="/admin/cleanup" data-confirm="Delete {{ cleanup | length }} file(s) now?">
+      <button class="btn danger">{{ i("trash") }}Clean up now</button>
+    </form>
+    {% else %}
+    <p class="hint">Nothing to delete right now.</p>
+    {% endif %}
+  </section>
+</div>
+{% endblock %}

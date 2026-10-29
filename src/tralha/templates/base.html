@@ -1,0 +1,53 @@
+{% from "_icons.html" import i with context %}
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>{% block title %}tralha{% endblock %} — tralha</title>
+<link rel="icon" href="/admin/static/icon.svg" type="image/svg+xml">
+<link rel="preload" href="/admin/static/fonts/ibm-plex-sans-latin-400-normal.woff2" as="font" type="font/woff2" crossorigin>
+<link rel="stylesheet" href="/admin/static/admin.css">
+<script src="/admin/static/admin.js" defer></script>
+</head>
+<body>
+{% if flash %}
+<div class="toast {{ 'error' if flash.startswith('Error') }}" role="status" aria-live="polite">
+  <span>{{ flash }}</span><button type="button" aria-label="Dismiss">×</button>
+</div>
+{% endif %}
+{% block body %}
+<div class="shell">
+  <aside class="side">
+    <a class="brand" href="/admin/files" aria-label="tralha home">
+      <img src="/admin/static/icon.svg" width="34" height="34" alt="">
+      <span class="wordmark">tralha</span>
+    </a>
+    <h3>Buckets</h3>
+    <nav class="buckets" aria-label="Buckets">
+      {% for b in nav_buckets %}
+        {% if b.name == current_bucket %}
+        <a class="bucket-link" href="{{ files_url(b.name) }}" aria-current="page"><span class="tape"><span>{{ b.name }}</span></span><small>{{ b.objects }}</small></a>
+        {% else %}
+        <a class="bucket-link" href="{{ files_url(b.name) }}"><span>{{ b.name }}</span><small>{{ b.objects }}</small></a>
+        {% endif %}
+      {% else %}
+        <p class="empty-nav">No buckets yet.</p>
+      {% endfor %}
+    </nav>
+    <div class="grow"></div>
+    <nav class="config" aria-label="Settings">
+      <a href="/admin/buckets" {{ 'aria-current=page' if section == 'buckets' }}>{{ i("boxes") }}<span class="label">Manage buckets</span></a>
+      <a href="/admin/settings" {{ 'aria-current=page' if section == 'settings' }}>{{ i("sliders") }}<span class="label">System</span></a>
+    </nav>
+    <form method="post" action="/admin/logout" class="logout">
+      <button class="btn quiet sm">{{ i("logout") }}<span class="label">Sign out</span></button>
+    </form>
+  </aside>
+  <div class="main">
+    {% block main %}{% endblock %}
+  </div>
+</div>
+{% endblock %}
+</body>
+</html>
