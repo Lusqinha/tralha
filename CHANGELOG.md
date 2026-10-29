@@ -2,6 +2,20 @@
 
 All notable changes to tralha are listed here. Versions follow [Semantic Versioning](https://semver.org/); while the version is below 1.0, a minor release can break compatibility.
 
+## [0.2.0] - 2026-10-29
+
+### Added
+
+- Easypanel deployment: `deploy/easypanel/schema.json` for Create from Schema, and the same definition as a template in the easypanel-io/templates layout.
+
+### Fixed
+
+- CLI help and error messages that were still in Portuguese.
+
+### Documentation
+
+- The README links to the new wiki and explains the Easypanel deployment.
+
 ## [0.1.0] - 2026-10-29
 
 First public release.
@@ -33,4 +47,5 @@ First public release.
 - No database migrations yet; a schema change can require a fresh database.
 - ChatGPT connectors need OAuth, which is not supported yet.
 
+[0.2.0]: https://github.com/Lusqinha/tralha/releases/tag/v0.2.0
 [0.1.0]: https://github.com/Lusqinha/tralha/releases/tag/v0.1.0

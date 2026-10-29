@@ -20,14 +20,14 @@ _UNITS = {"s": 1, "m": 60, "h": 3600, "d": 86400}
 def duration(value: str) -> int:
     m = _DURATION.match(value)
     if not m:
-        raise argparse.ArgumentTypeError("use formatos como 30m, 12h, 7d")
+        raise argparse.ArgumentTypeError("use a format like 30m, 12h or 7d")
     return int(m[1]) * _UNITS[m[2]]
 
 
 def size(value: str) -> int:
     m = re.match(r"^(\d+)([KMG]B?)?$", value.upper())
     if not m:
-        raise argparse.ArgumentTypeError("use formatos como 500MB, 2GB")
+        raise argparse.ArgumentTypeError("use a format like 500MB or 2GB")
     return int(m[1]) * {"": 1, "K": 1 << 10, "M": 1 << 20, "G": 1 << 30}[(m[2] or "")[:1]]
 
 
@@ -175,7 +175,7 @@ def cmd_gc(args) -> None:
 def setting(value: str) -> tuple[str, str]:
     name, sep, val = value.partition("=")
     if not sep:
-        raise argparse.ArgumentTypeError("use nome=valor")
+        raise argparse.ArgumentTypeError("use name=value")
     return name, val
 
 
@@ -216,7 +216,7 @@ def main() -> None:
     p.add_argument(
         "--ttl", type=duration, help="adds a rule that deletes objects after this long, e.g. 7d"
     )
-    p.add_argument("--max-size", type=size, help="quota, ex.: 2GB")
+    p.add_argument("--max-size", type=size, help="quota, e.g. 2GB")
     p.add_argument("--on-full", choices=service.ON_FULL, default="reject")
     p.add_argument(
         "--compression",
@@ -228,7 +228,7 @@ def main() -> None:
     p = bucket.add_parser("set", help="change a bucket")
     p.add_argument("name")
     p.add_argument("--public", action=argparse.BooleanOptionalAction, default=None)
-    p.add_argument("--max-size", type=size, help="0 remove a quota")
+    p.add_argument("--max-size", type=size, help="0 removes the quota")
     p.add_argument("--on-full", choices=service.ON_FULL)
     p.add_argument("--compression", choices=("inherit", *system.COMPRESSION_MODES))
     p.set_defaults(fn=cmd_bucket_set)
@@ -236,7 +236,7 @@ def main() -> None:
     rule = sub.add_parser("rule", help="cleanup rules").add_subparsers(required=True)
     p = rule.add_parser("add")
     p.add_argument("bucket")
-    p.add_argument("--expire", type=duration, required=True, help="ex.: 7d, 12h")
+    p.add_argument("--expire", type=duration, required=True, help="e.g. 7d or 12h")
     p.add_argument("--prefix", default="")
     p.add_argument("--basis", choices=service.RULE_BASIS, default="created")
     p.add_argument(
@@ -248,7 +248,7 @@ def main() -> None:
     p.set_defaults(fn=cmd_rule_rm)
 
     p = sub.add_parser("settings", help="show or change system settings")
-    p.add_argument("set", nargs="*", type=setting, help="ex.: compression=lossless")
+    p.add_argument("set", nargs="*", type=setting, help="e.g. compression=lossless")
     p.set_defaults(fn=cmd_settings)
 
     p = sub.add_parser("gc", help="apply cleanup rules and remove orphan blobs")

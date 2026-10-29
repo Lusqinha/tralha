@@ -20,6 +20,8 @@ Everything is private by default. A file only becomes reachable from the interne
 
 ![The admin panel showing a screenshot with its public link and details](docs/panel.png)
 
+The [wiki](https://github.com/Lusqinha/tralha/wiki) explains each part in more depth: the architecture, the MCP tools, cleanup rules, the security model and deployment options.
+
 ## How it works
 
 Files live in buckets. A file's key is a path like `pr-128/login-before.png`, and the slashes act as folders. Each bucket has its own visibility, quota, cleanup rules and image compression setting.
@@ -115,6 +117,10 @@ Then connect your local agent to `https://api.example.com/mcp`. With port 8000 o
 - `TRALHA_ADMIN_ALLOWED_IPS` restricts the panel to your IPs or networks. Anyone else gets a 404 at `/admin`, while the API and MCP keep working from anywhere.
 - `--expires` on `tralha key create` limits how long a leaked key stays useful. `tralha key list` shows when and from which IP each key was last used.
 - Prefer a VPN such as Tailscale if you would rather keep the API off the internet altogether. Bind port 8000 to the VPN address and point `TRALHA_API_URL` at it; the agent uses that URL for uploads.
+
+### On Easypanel
+
+In an Easypanel project, open **Templates → Create from Schema** and paste [`deploy/easypanel/schema.json`](deploy/easypanel/schema.json). Easypanel builds the image from `master`, serves the API and panel on the service domain and links on `files-` plus that domain, both over HTTPS. After the first deploy, create an admin key from the service console with `tralha key create admin --scope '*:admin'`.
 
 ## Configuration
 

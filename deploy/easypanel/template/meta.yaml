@@ -1,0 +1,46 @@
+name: tralha
+description:
+  tralha (Tool for Remote Artifact Linking & Hosting for AIs) is self-hosted
+  storage for the files AI agents produce, such as PR screenshots, reports and
+  notes. Agents use it through an MCP server or a REST API, files can be shared
+  with revocable public links, and a web panel lets you browse, preview and
+  upload. Uploaded images are decoded in a sandboxed worker.
+instructions:
+  The main domain serves the API, the MCP server at /mcp and the admin panel at
+  /admin. The files- domain serves public links. After the first deploy, open
+  the service console and run `tralha key create admin --scope '*:admin'` to get
+  an admin key, then `tralha bucket create pr-assets` for a first bucket.
+changeLog:
+  - date: 2026-10-29
+    description: first release
+links:
+  - label: Github
+    url: https://github.com/Lusqinha/tralha
+  - label: Documentation
+    url: https://github.com/Lusqinha/tralha/wiki
+contributors:
+  - name: Lucas Borges
+    url: https://github.com/Lusqinha
+schema:
+  type: object
+  required:
+    - appServiceName
+    - gitRef
+    - maxUploadMb
+  properties:
+    appServiceName:
+      type: string
+      title: App Service Name
+      default: tralha
+    gitRef:
+      type: string
+      title: Git branch or tag
+      default: master
+    maxUploadMb:
+      type: number
+      title: Maximum upload size (MB)
+      default: 25
+    adminAllowedIps:
+      type: string
+      title: IPs allowed to open the admin panel (comma separated, empty allows all)
+      default: ""
