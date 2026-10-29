@@ -1,0 +1,44 @@
+{
+  "services": [
+    {
+      "type": "app",
+      "data": {
+        "serviceName": "tralha",
+        "source": {
+          "type": "git",
+          "repo": "https://github.com/Lusqinha/tralha.git",
+          "ref": "master",
+          "path": "/"
+        },
+        "build": {
+          "type": "dockerfile",
+          "file": "Dockerfile"
+        },
+        "env": "TRALHA_API_URL=https://$(EASYPANEL_DOMAIN)\nTRALHA_PUBLIC_URL=https://files-$(EASYPANEL_DOMAIN)\nTRALHA_FORWARDED_ALLOW_IPS=10.0.0.0/8,172.16.0.0/12,192.168.0.0/16\nTRALHA_MAX_UPLOAD_MB=25",
+        "domains": [
+          {
+            "host": "$(EASYPANEL_DOMAIN)",
+            "port": 8000
+          },
+          {
+            "host": "files-$(EASYPANEL_DOMAIN)",
+            "port": 8001
+          }
+        ],
+        "mounts": [
+          {
+            "type": "volume",
+            "name": "data",
+            "mountPath": "/data"
+          }
+        ],
+        "deploy": {
+          "replicas": 1,
+          "command": null,
+          "zeroDowntime": false,
+          "capDrop": ["ALL"]
+        }
+      }
+    }
+  ]
+}
