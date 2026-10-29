@@ -126,7 +126,9 @@ api_keys = Table(
     Column("key_hash", String(64), nullable=False, unique=True),
     Column("scopes", Text, nullable=False),
     Column("created_at", BigInteger, nullable=False),
+    Column("expires_at", BigInteger),
     Column("last_used_at", BigInteger),
+    Column("last_used_ip", String(64)),
     Column("revoked_at", BigInteger),
 )
 

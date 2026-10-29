@@ -4,6 +4,7 @@ import argparse
 import asyncio
 import re
 import sys
+from datetime import datetime
 
 from sqlalchemy import select, update
 
@@ -60,7 +61,7 @@ def cmd_serve(args) -> None:
 
 
 def cmd_key_create(args) -> None:
-    key = create_key(args.name, " ".join(args.scope))
+    key = create_key(args.name, " ".join(args.scope), args.expires)
     print(key)
     print("Store it now: the key is not shown again.", file=sys.stderr)
 
@@ -69,8 +70,24 @@ def cmd_key_list(_args) -> None:
     with get_engine().connect() as conn:
         rows = conn.execute(select(api_keys).order_by(api_keys.c.id)).all()
     for r in rows:
-        status = "revogada" if r.revoked_at else "ativa"
-        print(f"{r.id:>4}  {r.prefix}…  {r.name:<24} {status:<9} {r.scopes}")
+        print(
+            f"{r.id:>4}  {r.prefix}…  {r.name:<20} {_key_status(r):<22} "
+            f"last used {_when(r.last_used_at)} from {r.last_used_ip or '-'}  {r.scopes}"
+        )
+
+
+def _when(ts: int | None) -> str:
+    return datetime.fromtimestamp(ts).strftime("%Y-%m-%d %H:%M") if ts else "never"
+
+
+def _key_status(row) -> str:
+    if row.revoked_at:
+        return "revoked"
+    if row.expires_at and row.expires_at <= now():
+        return "expired"
+    if row.expires_at:
+        return f"expires {_when(row.expires_at)}"
+    return "active"
 
 
 def cmd_key_revoke(args) -> None:
@@ -142,7 +159,7 @@ def cmd_settings(args) -> None:
     try:
         values = system.update(dict(args.set)) if args.set else system.get_all()
     except system.InvalidSetting as e:
-        sys.exit(f"erro: {e}")
+        sys.exit(f"error: {e}")
     for name, value in values.items():
         print(f"{name} = {value}")
 
@@ -185,6 +202,7 @@ def main() -> None:
         required=True,
         help="bucket:permission, repeatable. E.g. --scope 'scratch:write'",
     )
+    p.add_argument("--expires", type=duration, help="key lifetime, e.g. 90d; default: no expiry")
     p.set_defaults(fn=cmd_key_create)
     key.add_parser("list").set_defaults(fn=cmd_key_list)
     p = key.add_parser("revoke")
@@ -243,4 +261,4 @@ def main() -> None:
     try:
         args.fn(args)
     except (service.ServiceError, InvalidScope) as e:
-        sys.exit(f"erro: {e}")
+        sys.exit(f"error: {e}")
