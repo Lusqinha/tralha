@@ -20,6 +20,8 @@ Everything is private by default. A file only becomes reachable from the interne
 
 ![The admin panel showing a screenshot with its public link and details](docs/panel.png)
 
+The [wiki](https://github.com/Lusqinha/tralha/wiki) explains each part in more depth: the architecture, the MCP tools, cleanup rules, the security model and deployment options.
+
 ## How it works
 
 Files live in buckets. A file's key is a path like `pr-128/login-before.png`, and the slashes act as folders. Each bucket has its own visibility, quota, cleanup rules and image compression setting.
